@@ -112,6 +112,109 @@ const seeds: Seed[] = [];
   seeds.push({ name: 'The Gauntlet', layout: { cells, tee: { x: 6, y: 13 }, cup: { x: 6, y: 3 } } });
 }
 
+// ── The back nine: harder, weirder ──────────────────────────────
+
+// 10 — Hourglass: two chambers pinched in the middle
+{
+  const cells = base();
+  row(cells, 8, 1, 4, TILE.WALL);
+  row(cells, 8, 8, 10, TILE.WALL);
+  set(cells, 5, 8, TILE.SAND);
+  set(cells, 7, 8, TILE.SAND);
+  seeds.push({ name: 'Hourglass', layout: { cells, tee: { x: 6, y: 13 }, cup: { x: 6, y: 3 } } });
+}
+
+// 11 — Poseidon's Garden: water islands everywhere
+{
+  const cells = base();
+  set(cells, 3, 4, TILE.WATER);
+  set(cells, 4, 4, TILE.WATER);
+  set(cells, 8, 5, TILE.WATER);
+  set(cells, 9, 5, TILE.WATER);
+  set(cells, 5, 7, TILE.WATER);
+  set(cells, 6, 7, TILE.WATER);
+  set(cells, 2, 9, TILE.WATER);
+  set(cells, 3, 9, TILE.WATER);
+  set(cells, 8, 10, TILE.WATER);
+  set(cells, 9, 10, TILE.WATER);
+  set(cells, 5, 11, TILE.WATER);
+  seeds.push({ name: "Poseidon's Garden", layout: { cells, tee: { x: 6, y: 13 }, cup: { x: 6, y: 2 } } });
+}
+
+// 12 — The Pocket: cup in a walled nook, entry from below only
+{
+  const cells = base();
+  row(cells, 2, 3, 8, TILE.WALL);
+  col(cells, 3, 3, 5, TILE.WALL);
+  col(cells, 8, 3, 5, TILE.WALL);
+  seeds.push({ name: 'The Pocket', layout: { cells, tee: { x: 6, y: 13 }, cup: { x: 6, y: 4 } } });
+}
+
+// 13 — Beach Day: half the course is sand
+{
+  const cells = base();
+  for (let r = 5; r <= 11; r++) row(cells, r, 1, 5, TILE.SAND);
+  seeds.push({ name: 'Beach Day', layout: { cells, tee: { x: 3, y: 13 }, cup: { x: 3, y: 3 } } });
+}
+
+// 14 — Pinball: wall stubs everywhere
+{
+  const cells = base();
+  set(cells, 3, 5, TILE.WALL);
+  set(cells, 8, 4, TILE.WALL);
+  set(cells, 5, 7, TILE.WALL);
+  set(cells, 9, 8, TILE.WALL);
+  set(cells, 2, 9, TILE.WALL);
+  set(cells, 6, 10, TILE.WALL);
+  set(cells, 4, 11, TILE.WALL);
+  seeds.push({ name: 'Pinball', layout: { cells, tee: { x: 6, y: 13 }, cup: { x: 6, y: 2 } } });
+}
+
+// 15 — Moat & Castle: walled keep with a water ring
+{
+  const cells = base();
+  for (let c = 3; c <= 9; c++)
+    for (let r = 2; r <= 6; r++) {
+      if (c === 3 || c === 9 || r === 2 || r === 6) set(cells, c, r, TILE.WALL);
+    }
+  set(cells, 6, 6, TILE.GRASS); // gate
+  row(cells, 8, 2, 9, TILE.WATER);
+  set(cells, 6, 8, TILE.GRASS); // bridge
+  seeds.push({ name: 'Moat & Castle', layout: { cells, tee: { x: 6, y: 13 }, cup: { x: 6, y: 4 } } });
+}
+
+// 16 — Sidewinder: long left wall channel
+{
+  const cells = base();
+  col(cells, 4, 4, 12, TILE.WALL);
+  col(cells, 8, 2, 10, TILE.WALL);
+  seeds.push({ name: 'Sidewinder', layout: { cells, tee: { x: 2, y: 13 }, cup: { x: 6, y: 2 } } });
+}
+
+// 17 — Quicksand Cross: sand plus in the middle
+{
+  const cells = base();
+  row(cells, 8, 3, 9, TILE.SAND);
+  col(cells, 6, 5, 11, TILE.SAND);
+  set(cells, 2, 5, TILE.WATER);
+  set(cells, 10, 11, TILE.WATER);
+  seeds.push({ name: 'Quicksand Cross', layout: { cells, tee: { x: 6, y: 13 }, cup: { x: 6, y: 3 } } });
+}
+
+// 18 — The Final Boss: everything at once
+{
+  const cells = base();
+  row(cells, 5, 3, 8, TILE.WALL);
+  row(cells, 9, 1, 7, TILE.WALL);
+  set(cells, 2, 3, TILE.WATER);
+  set(cells, 3, 3, TILE.WATER);
+  set(cells, 9, 7, TILE.SAND);
+  set(cells, 10, 7, TILE.SAND);
+  set(cells, 5, 11, TILE.WATER);
+  set(cells, 8, 12, TILE.SAND);
+  seeds.push({ name: 'The Final Boss', layout: { cells, tee: { x: 9, y: 13 }, cup: { x: 2, y: 2 } } });
+}
+
 // ── Brute-force ace solver over the real physics ────────────────
 function solveAce(layout: HoleLayout): Shot | null {
   const start = cellCenter(layout.tee);

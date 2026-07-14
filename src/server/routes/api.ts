@@ -28,11 +28,20 @@ import { SEED_HOLES } from '../core/seeds';
 export const api = new Hono();
 
 // First visitor to a fresh install triggers the starter course.
+// Idempotent by name: installs that predate newer seed batches pick up
+// the missing holes without disturbing player-built ones.
 async function seedIfEmpty(): Promise<void> {
-  // atomic claim — concurrent first visitors can't double-seed
-  const claim = await redis.incrBy('world:seeded', 1);
+  // atomic claim — concurrent visitors can't double-seed
+  const claim = await redis.incrBy('world:seedbatch2', 1);
   if (claim !== 1) return;
+  const chain = await getChain();
+  const existing = new Set<string>();
+  for (const id of chain) {
+    const h = await getHole(id);
+    if (h && h.author === 'putt_together') existing.add(h.name);
+  }
   for (const s of SEED_HOLES) {
+    if (existing.has(s.name)) continue;
     const id = await nextHoleId();
     await saveHole({
       id,
@@ -75,6 +84,7 @@ api.get('/world', async (c) => {
         author: hole.author,
         par: hole.par,
         plays: hole.plays,
+        layout: hole.layout,
         record: record ? { holder: record.holder, strokes: record.strokes } : null,
         completedByMe: me.completed.includes(hole.id),
       };

@@ -66,6 +66,7 @@ export type WorldResponse = {
     author: string;
     par: number;
     plays: number;
+    layout: HoleLayout; // used for the card mini-previews
     record: { holder: string; strokes: number } | null;
     completedByMe: boolean;
   }[];

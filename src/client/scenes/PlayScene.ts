@@ -417,69 +417,212 @@ export class PlayScene extends Scene {
   private celebrate() {
     const cup = cellCenter(this.layout.cup);
     this.puff(cup, 0xffd700, 16);
-    const label = this.strokes === 1 ? 'ACE! 🏆' : `Sunk in ${this.strokes}`;
-    const txt = this.add
-      .text(WORLD_W / 2, WORLD_H / 2 - 60, label, {
-        fontFamily: 'Arial Black',
-        fontSize: 64,
-        color: '#ffd700',
-        stroke: '#000000',
-        strokeThickness: 10,
-      })
-      .setOrigin(0.5)
-      .setDepth(20)
-      .setScale(0.2);
-    this.tweens.add({ targets: txt, scale: 1, duration: 380, ease: 'Back.out' });
-
     if (this.holeId) {
-      void this.submitRun(txt);
+      void this.showResults();
     } else {
+      // editor test run: quick banner, then hand back to the builder
+      const label = this.strokes === 1 ? 'ACE! 🏆' : `Sunk in ${this.strokes}`;
+      const txt = this.add
+        .text(WORLD_W / 2, WORLD_H / 2 - 60, label, {
+          fontFamily: 'Arial Black',
+          fontSize: 64,
+          color: '#ffd700',
+          stroke: '#000000',
+          strokeThickness: 10,
+        })
+        .setOrigin(0.5)
+        .setDepth(20)
+        .setScale(0.2);
+      this.tweens.add({ targets: txt, scale: 1, duration: 380, ease: 'Back.out' });
       this.time.delayedCall(900, () => {
         this.onFinished?.(this.strokes, this.shots);
       });
     }
   }
 
-  private async submitRun(headline: Phaser.GameObjects.Text) {
-    let sub = 'saving…';
-    const subText = this.add
-      .text(WORLD_W / 2, WORLD_H / 2 + 10, sub, {
-        fontFamily: 'Arial Black',
-        fontSize: 30,
-        color: '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 6,
-      })
-      .setOrigin(0.5)
-      .setDepth(20);
+  // ── the win screen: stars, confetti, counting points ──────────
+  private async showResults() {
+    // submit while the cup-drop effect plays
+    let points = 0;
+    let newRecord = false;
+    let saveFailed = false;
     try {
       const res = await api.submitRun({
         holeId: this.holeId!,
         strokes: this.strokes,
         shots: this.shots,
       });
-      sub = res.newRecord ? `🏆 NEW RECORD! +${res.points} pts` : `+${res.points} pts`;
-      if (res.newRecord) {
-        headline.setText(this.strokes === 1 ? 'ACE! 🏆' : 'NEW RECORD!');
-        this.cameras.main.shake(150, 0.006);
-      }
+      points = res.points;
+      newRecord = res.newRecord;
     } catch (e) {
       console.error('submit failed', e);
-      sub = 'score not saved (offline?)';
+      saveFailed = true;
     }
-    subText.setText(sub);
-    const btn = this.add
-      .text(WORLD_W / 2, WORLD_H / 2 + 90, '▶ NEXT', {
+
+    const cx = WORLD_W / 2;
+    const cy = WORLD_H / 2;
+    const overlay = this.add
+      .rectangle(cx, cy, WORLD_W * 2, WORLD_H * 2, 0x000000, 0)
+      .setDepth(19);
+    this.tweens.add({ targets: overlay, fillAlpha: 0.55, duration: 300 });
+
+    const panel = this.add
+      .rectangle(cx, cy, 620, 520, 0x1d4a18, 0.97)
+      .setStrokeStyle(6, 0xffd700)
+      .setDepth(20)
+      .setScale(0.4)
+      .setAlpha(0);
+    this.tweens.add({ targets: panel, scale: 1, alpha: 1, duration: 320, ease: 'Back.out' });
+
+    // headline
+    const headline = newRecord
+      ? this.strokes === 1
+        ? 'ACE! 👑'
+        : 'NEW RECORD! 👑'
+      : this.strokes === 1
+        ? 'ACE!'
+        : this.strokes <= 2
+          ? 'GREAT PUTT!'
+          : 'SUNK IT!';
+    const head = this.add
+      .text(cx, cy - 190, headline, {
         fontFamily: 'Arial Black',
-        fontSize: 34,
-        color: '#ffffff',
-        backgroundColor: '#e63946',
-        padding: { x: 30, y: 14 } as Phaser.Types.GameObjects.Text.TextPadding,
+        fontSize: 58,
+        color: '#ffd700',
+        stroke: '#000000',
+        strokeThickness: 10,
       })
       .setOrigin(0.5)
-      .setDepth(20)
+      .setDepth(21)
+      .setScale(0.2);
+    this.tweens.add({ targets: head, scale: 1, duration: 400, ease: 'Back.out', delay: 150 });
+    if (newRecord) this.cameras.main.shake(180, 0.007);
+
+    // stars: 3 = ace or record, 2 = par or better, 1 = finished
+    const stars = this.strokes === 1 || newRecord ? 3 : this.strokes <= 2 ? 2 : 1;
+    for (let i = 0; i < 3; i++) {
+      const sx = cx + (i - 1) * 120;
+      const filled = i < stars;
+      const star = this.add
+        .text(sx, cy - 80, '★', {
+          fontSize: 96,
+          color: filled ? '#ffd700' : '#3a3a3a',
+          stroke: '#000000',
+          strokeThickness: 8,
+        })
+        .setOrigin(0.5)
+        .setDepth(21)
+        .setScale(0)
+        .setAngle(-30);
+      this.tweens.add({
+        targets: star,
+        scale: filled ? 1 : 0.75,
+        angle: 0,
+        duration: 330,
+        ease: 'Back.out',
+        delay: 420 + i * 260,
+        onStart: () => {
+          if (filled) sfx.sink();
+        },
+      });
+      if (filled) {
+        this.time.delayedCall(430 + i * 260, () => this.puff({ x: sx, y: cy - 80 }, 0xffd700, 8));
+      }
+    }
+
+    // strokes line
+    this.add
+      .text(cx, cy + 10, `sunk in ${this.strokes} stroke${this.strokes === 1 ? '' : 's'}`, {
+        fontFamily: 'Arial Black',
+        fontSize: 28,
+        color: '#ffffff',
+      })
+      .setOrigin(0.5)
+      .setDepth(21);
+
+    // points counter rolls up
+    const ptsText = this.add
+      .text(cx, cy + 68, saveFailed ? 'score not saved — offline?' : '+0 pts', {
+        fontFamily: 'Arial Black',
+        fontSize: 44,
+        color: saveFailed ? '#ff9999' : '#7CFC00',
+        stroke: '#000000',
+        strokeThickness: 8,
+      })
+      .setOrigin(0.5)
+      .setDepth(21);
+    if (!saveFailed) {
+      const counter = { v: 0 };
+      this.tweens.add({
+        targets: counter,
+        v: points,
+        duration: 800,
+        delay: 1200,
+        ease: 'Cubic.out',
+        onUpdate: () => ptsText.setText(`+${Math.round(counter.v)} pts`),
+      });
+    }
+
+    // confetti rain
+    this.time.delayedCall(350, () => this.confetti(stars * 24));
+
+    // buttons
+    const retry = this.add
+      .text(cx - 130, cy + 172, '↻ RETRY', {
+        fontFamily: 'Arial Black',
+        fontSize: 30,
+        color: '#ffffff',
+        backgroundColor: '#2d6cdf',
+        padding: { x: 24, y: 12 } as Phaser.Types.GameObjects.Text.TextPadding,
+      })
+      .setOrigin(0.5)
+      .setDepth(21)
       .setInteractive({ useHandCursor: true });
-    btn.on('pointerdown', () => this.scene.start('World'));
+    retry.on('pointerdown', () => {
+      sfx.click();
+      this.scene.restart({
+        layout: this.layout,
+        holeName: this.holeName,
+        holeId: this.holeId,
+        ghost: this.ghost,
+      });
+    });
+    const next = this.add
+      .text(cx + 120, cy + 172, '▶ NEXT', {
+        fontFamily: 'Arial Black',
+        fontSize: 30,
+        color: '#ffffff',
+        backgroundColor: '#e63946',
+        padding: { x: 30, y: 12 } as Phaser.Types.GameObjects.Text.TextPadding,
+      })
+      .setOrigin(0.5)
+      .setDepth(21)
+      .setInteractive({ useHandCursor: true });
+    next.on('pointerdown', () => {
+      sfx.click();
+      this.scene.start('World');
+    });
+  }
+
+  private confetti(n: number) {
+    const colors = [0xffd700, 0xe63946, 0x2d6cdf, 0x66bb6a, 0xffffff, 0xff8c00];
+    for (let i = 0; i < n; i++) {
+      const x = Math.random() * WORLD_W;
+      const piece = this.add
+        .rectangle(x, -20 - Math.random() * 200, 10 + Math.random() * 8, 14 + Math.random() * 8,
+          colors[i % colors.length])
+        .setDepth(22)
+        .setAngle(Math.random() * 360);
+      this.tweens.add({
+        targets: piece,
+        y: WORLD_H + 40,
+        x: x + (Math.random() - 0.5) * 220,
+        angle: piece.angle + 360 + Math.random() * 540,
+        duration: 1600 + Math.random() * 1400,
+        ease: 'Cubic.in',
+        onComplete: () => piece.destroy(),
+      });
+    }
   }
 
   private updateHud() {
