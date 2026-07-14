@@ -12,6 +12,7 @@ import {
 } from '../../shared/types';
 import { api } from '../net';
 import { sfx } from '../sound';
+import { FONT, HEX, PALETTE, drawButton, drawBack } from '../ui';
 import {
   WORLD_W,
   WORLD_H,
@@ -24,13 +25,13 @@ import {
 } from '../../shared/physics';
 
 const COLORS = {
-  grassA: 0x58b64c,
-  grassB: 0x51ab46,
-  wall: 0x3d2c1e,
-  wallTop: 0x5a4430,
-  sand: 0xe8d08a,
-  water: 0x3f9bd8,
-  waterDeep: 0x2f7fb8,
+  grassA: PALETTE.grassA,
+  grassB: PALETTE.grassB,
+  wall: PALETTE.wall,
+  wallTop: PALETTE.wallTop,
+  sand: PALETTE.sand,
+  water: PALETTE.water,
+  waterDeep: PALETTE.waterDeep,
   ball: 0xffffff,
   cup: 0x1a1a1a,
   aim: 0xffffff,
@@ -131,13 +132,14 @@ export class PlayScene extends Scene {
     this.ball = this.makeBall().setDepth(5);
     this.aimG = this.add.graphics().setDepth(6);
 
+    const hudChip = this.add.graphics().setDepth(9);
+    hudChip.fillStyle(0x000000, 0.32);
+    hudChip.fillRoundedRect(WORLD_W / 2 - 210, 16, 420, 46, 23);
     this.hud = this.add
-      .text(WORLD_W / 2, 34, '', {
-        fontFamily: 'Arial Black',
-        fontSize: 30,
-        color: '#ffffff',
-        stroke: '#00000088',
-        strokeThickness: 6,
+      .text(WORLD_W / 2, 39, '', {
+        fontFamily: FONT,
+        fontSize: 26,
+        color: HEX.cream,
       })
       .setOrigin(0.5)
       .setDepth(10);
@@ -149,17 +151,7 @@ export class PlayScene extends Scene {
     this.setupGhost();
 
     if (this.holeId) {
-      const back = this.add
-        .text(16, 18, '‹ course', {
-          fontFamily: 'Arial Black',
-          fontSize: 26,
-          color: '#ffffff',
-          backgroundColor: '#00000055',
-          padding: { x: 14, y: 8 } as Phaser.Types.GameObjects.Text.TextPadding,
-        })
-        .setDepth(10)
-        .setInteractive({ useHandCursor: true });
-      back.on('pointerdown', () => this.scene.start('World'));
+      drawBack(this, () => this.scene.start('World'));
     }
   }
 
@@ -180,7 +172,7 @@ export class PlayScene extends Scene {
     body.setStrokeStyle(2, 0x8ab8dd);
     const tag = this.add
       .text(0, -BALL_R - 16, `u/${this.ghost.holder} · ${this.ghost.strokes}`, {
-        fontFamily: 'Arial',
+        fontFamily: FONT,
         fontSize: 16,
         color: '#dbefff',
       })
@@ -421,12 +413,12 @@ export class PlayScene extends Scene {
       void this.showResults();
     } else {
       // editor test run: quick banner, then hand back to the builder
-      const label = this.strokes === 1 ? 'ACE! 🏆' : `Sunk in ${this.strokes}`;
+      const label = this.strokes === 1 ? 'ACE!' : `Sunk in ${this.strokes}`;
       const txt = this.add
         .text(WORLD_W / 2, WORLD_H / 2 - 60, label, {
-          fontFamily: 'Arial Black',
-          fontSize: 64,
-          color: '#ffd700',
+          fontFamily: FONT,
+          fontSize: 68,
+          color: HEX.gold,
           stroke: '#000000',
           strokeThickness: 10,
         })
@@ -466,19 +458,20 @@ export class PlayScene extends Scene {
       .setDepth(19);
     this.tweens.add({ targets: overlay, fillAlpha: 0.55, duration: 300 });
 
-    const panel = this.add
-      .rectangle(cx, cy, 620, 520, 0x1d4a18, 0.97)
-      .setStrokeStyle(6, 0xffd700)
-      .setDepth(20)
-      .setScale(0.4)
-      .setAlpha(0);
-    this.tweens.add({ targets: panel, scale: 1, alpha: 1, duration: 320, ease: 'Back.out' });
+    const panelG = this.add.graphics().setDepth(20).setAlpha(0);
+    panelG.fillStyle(0x000000, 0.3);
+    panelG.fillRoundedRect(cx - 310 + 5, cy - 260 + 8, 620, 520, 28);
+    panelG.fillStyle(PALETTE.fairwayDark, 1);
+    panelG.fillRoundedRect(cx - 310, cy - 260, 620, 520, 28);
+    panelG.lineStyle(5, PALETTE.gold, 1);
+    panelG.strokeRoundedRect(cx - 310, cy - 260, 620, 520, 28);
+    this.tweens.add({ targets: panelG, alpha: 1, duration: 320 });
 
     // headline
     const headline = newRecord
       ? this.strokes === 1
-        ? 'ACE! 👑'
-        : 'NEW RECORD! 👑'
+        ? 'ACE! NEW RECORD!'
+        : 'NEW RECORD!'
       : this.strokes === 1
         ? 'ACE!'
         : this.strokes <= 2
@@ -486,9 +479,9 @@ export class PlayScene extends Scene {
           : 'SUNK IT!';
     const head = this.add
       .text(cx, cy - 190, headline, {
-        fontFamily: 'Arial Black',
-        fontSize: 58,
-        color: '#ffd700',
+        fontFamily: FONT,
+        fontSize: newRecord ? 48 : 58,
+        color: HEX.gold,
         stroke: '#000000',
         strokeThickness: 10,
       })
@@ -533,9 +526,9 @@ export class PlayScene extends Scene {
     // strokes line
     this.add
       .text(cx, cy + 10, `sunk in ${this.strokes} stroke${this.strokes === 1 ? '' : 's'}`, {
-        fontFamily: 'Arial Black',
-        fontSize: 28,
-        color: '#ffffff',
+        fontFamily: FONT,
+        fontSize: 26,
+        color: HEX.paleGreen,
       })
       .setOrigin(0.5)
       .setDepth(21);
@@ -543,9 +536,9 @@ export class PlayScene extends Scene {
     // points counter rolls up
     const ptsText = this.add
       .text(cx, cy + 68, saveFailed ? 'score not saved — offline?' : '+0 pts', {
-        fontFamily: 'Arial Black',
-        fontSize: 44,
-        color: saveFailed ? '#ff9999' : '#7CFC00',
+        fontFamily: FONT,
+        fontSize: 46,
+        color: saveFailed ? '#ff9999' : '#9be564',
         stroke: '#000000',
         strokeThickness: 8,
       })
@@ -567,41 +560,31 @@ export class PlayScene extends Scene {
     this.time.delayedCall(350, () => this.confetti(stars * 24));
 
     // buttons
-    const retry = this.add
-      .text(cx - 130, cy + 172, '↻ RETRY', {
-        fontFamily: 'Arial Black',
-        fontSize: 30,
-        color: '#ffffff',
-        backgroundColor: '#2d6cdf',
-        padding: { x: 24, y: 12 } as Phaser.Types.GameObjects.Text.TextPadding,
-      })
-      .setOrigin(0.5)
-      .setDepth(21)
-      .setInteractive({ useHandCursor: true });
-    retry.on('pointerdown', () => {
-      sfx.click();
-      this.scene.restart({
-        layout: this.layout,
-        holeName: this.holeName,
-        holeId: this.holeId,
-        ghost: this.ghost,
-      });
-    });
-    const next = this.add
-      .text(cx + 120, cy + 172, '▶ NEXT', {
-        fontFamily: 'Arial Black',
-        fontSize: 30,
-        color: '#ffffff',
-        backgroundColor: '#e63946',
-        padding: { x: 30, y: 12 } as Phaser.Types.GameObjects.Text.TextPadding,
-      })
-      .setOrigin(0.5)
-      .setDepth(21)
-      .setInteractive({ useHandCursor: true });
-    next.on('pointerdown', () => {
-      sfx.click();
-      this.scene.start('World');
-    });
+    drawButton(
+      this,
+      cx - 135,
+      cy + 176,
+      { w: 220, h: 74, fill: PALETTE.blue, fillDark: 0x24509e, label: 'RETRY', size: 28 },
+      () => {
+        sfx.click();
+        this.scene.restart({
+          layout: this.layout,
+          holeName: this.holeName,
+          holeId: this.holeId,
+          ghost: this.ghost,
+        });
+      }
+    ).setDepth(21);
+    drawButton(
+      this,
+      cx + 135,
+      cy + 176,
+      { w: 220, h: 74, fill: PALETTE.accent, fillDark: PALETTE.accentDark, label: 'NEXT', size: 28 },
+      () => {
+        sfx.click();
+        this.scene.start('World');
+      }
+    ).setDepth(21);
   }
 
   private confetti(n: number) {

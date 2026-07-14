@@ -11,6 +11,8 @@ import {
 } from '../../shared/types';
 import { WORLD_W, WORLD_H, validateLayout, cellCenter, BALL_R, CUP_R } from '../../shared/physics';
 import { api } from '../net';
+import { FONT, HEX, PALETTE, drawButton, drawBack } from '../ui';
+import { sfx } from '../sound';
 
 type Tool = 'wall' | 'sand' | 'water' | 'erase' | 'tee' | 'cup';
 
@@ -43,7 +45,7 @@ export class BuildScene extends Scene {
   private board!: Phaser.GameObjects.Container;
   private boardG!: Phaser.GameObjects.Graphics;
   private toolButtons: Map<Tool, Phaser.GameObjects.Rectangle> = new Map();
-  private publishBtn!: Phaser.GameObjects.Text;
+  private publishBtn!: Phaser.GameObjects.Container;
   private statusTxt!: Phaser.GameObjects.Text;
   private painting = false;
 
@@ -79,9 +81,9 @@ export class BuildScene extends Scene {
 
     this.statusTxt = this.add
       .text(WORLD_W / 2, WORLD_H - UI_H - 26, '', {
-        fontFamily: 'Arial Black',
+        fontFamily: FONT,
         fontSize: 22,
-        color: '#ffd700',
+        color: HEX.gold,
         stroke: '#000000',
         strokeThickness: 5,
       })
@@ -89,9 +91,9 @@ export class BuildScene extends Scene {
       .setDepth(10);
 
     if (this.aceProof) {
-      this.statusTxt.setText('✅ ACED! Your hole is ready to publish.');
+      this.statusTxt.setText('ACED! Your hole is ready to publish.');
     } else {
-      this.statusTxt.setText('Design your hole, then ACE it to publish.');
+      this.statusTxt.setText('Design your hole, then ace it to publish.');
     }
   }
 
@@ -147,63 +149,109 @@ export class BuildScene extends Scene {
   }
 
   private buildToolbar() {
-    const tools: { key: Tool; label: string; color: number }[] = [
-      { key: 'wall', label: '🧱', color: 0x5a4430 },
-      { key: 'sand', label: '🏖', color: 0xe8d08a },
-      { key: 'water', label: '💧', color: 0x3f9bd8 },
-      { key: 'erase', label: '🌱', color: 0x58b64c },
-      { key: 'tee', label: '⚪', color: 0x999999 },
-      { key: 'cup', label: '⛳', color: 0x1a1a1a },
+    const tools: { key: Tool; label: string }[] = [
+      { key: 'wall', label: 'WALL' },
+      { key: 'sand', label: 'SAND' },
+      { key: 'water', label: 'WATER' },
+      { key: 'erase', label: 'GRASS' },
+      { key: 'tee', label: 'TEE' },
+      { key: 'cup', label: 'CUP' },
     ];
-    const y = WORLD_H - UI_H + 44;
-    const w = 96;
-    const startX = (WORLD_W - tools.length * (w + 12)) / 2 + w / 2;
+    const y = WORLD_H - UI_H + 46;
+    const w = 100;
+    const startX = (WORLD_W - tools.length * (w + 14)) / 2 + w / 2;
     tools.forEach((t, i) => {
-      const x = startX + i * (w + 12);
-      const btn = this.add.rectangle(x, y, w, 76, t.color).setStrokeStyle(4, 0xffffff, 0.35);
-      const label = this.add.text(x, y, t.label, { fontSize: 38 }).setOrigin(0.5);
-      btn.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.selectTool(t.key));
+      const x = startX + i * (w + 14);
+      // frame (selection state drawn in selectTool)
+      const btn = this.add.rectangle(x, y, w, 84, 0x000000, 0.28);
+      btn.setStrokeStyle(4, 0xffffff, 0.25);
+      // swatch: a mini-preview of the actual tile art
+      const sw = this.add.graphics();
+      this.drawSwatch(sw, x, y - 12, t.key);
+      const label = this.add
+        .text(x, y + 26, t.label, { fontFamily: FONT, fontSize: 15, color: HEX.cream })
+        .setOrigin(0.5);
+      btn.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+        sfx.click();
+        this.selectTool(t.key);
+      });
       label.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.selectTool(t.key));
       this.toolButtons.set(t.key, btn);
     });
     this.selectTool('wall');
 
     // action buttons
-    const ay = WORLD_H - UI_H + 134;
-    const testBtn = this.add
-      .text(WORLD_W / 2 - 190, ay, '▶ TEST & ACE', {
-        fontFamily: 'Arial Black',
-        fontSize: 28,
-        color: '#ffffff',
-        backgroundColor: '#2d6cdf',
-        padding: { x: 24, y: 12 } as Phaser.Types.GameObjects.Text.TextPadding,
-      })
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
-    testBtn.on('pointerdown', () => this.testRun());
+    const ay = WORLD_H - UI_H + 138;
+    drawButton(
+      this,
+      WORLD_W / 2 - 180,
+      ay,
+      { w: 320, h: 72, fill: PALETTE.blue, fillDark: 0x24509e, label: 'TEST & ACE', size: 27 },
+      () => this.testRun()
+    );
+    this.publishBtn = drawButton(
+      this,
+      WORLD_W / 2 + 180,
+      ay,
+      { w: 300, h: 72, fill: PALETTE.accent, fillDark: PALETTE.accentDark, label: 'PUBLISH', size: 27 },
+      () => this.publish()
+    );
+    this.publishBtn.setAlpha(this.aceProof ? 1 : 0.45);
 
-    this.publishBtn = this.add
-      .text(WORLD_W / 2 + 170, ay, '🚀 PUBLISH', {
-        fontFamily: 'Arial Black',
-        fontSize: 28,
-        color: '#ffffff',
-        backgroundColor: this.aceProof ? '#e63946' : '#666666',
-        padding: { x: 24, y: 12 } as Phaser.Types.GameObjects.Text.TextPadding,
-      })
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
-    this.publishBtn.on('pointerdown', () => this.publish());
+    drawBack(this, () => this.scene.start('World'));
+  }
 
-    const backBtn = this.add
-      .text(16, 18, '‹ course', {
-        fontFamily: 'Arial Black',
-        fontSize: 24,
-        color: '#ffffff',
-        backgroundColor: '#00000055',
-        padding: { x: 12, y: 8 } as Phaser.Types.GameObjects.Text.TextPadding,
-      })
-      .setInteractive({ useHandCursor: true });
-    backBtn.on('pointerdown', () => this.scene.start('World'));
+  // mini-preview of the actual tile art used on the course
+  private drawSwatch(g: Phaser.GameObjects.Graphics, x: number, y: number, tool: Tool) {
+    const s = 44;
+    const l = x - s / 2;
+    const t = y - s / 2;
+    if (tool === 'wall') {
+      g.fillStyle(PALETTE.wall);
+      g.fillRoundedRect(l, t, s, s, 6);
+      g.fillStyle(PALETTE.wallTop);
+      g.fillRoundedRect(l + 3, t + 3, s - 6, s - 10, 5);
+    } else if (tool === 'sand') {
+      g.fillStyle(PALETTE.sand);
+      g.fillRoundedRect(l, t, s, s, 10);
+      g.fillStyle(PALETTE.sandGrain);
+      g.fillCircle(l + 12, t + 14, 2.5);
+      g.fillCircle(l + 28, t + 22, 2.5);
+      g.fillCircle(l + 18, t + 32, 2.5);
+    } else if (tool === 'water') {
+      g.fillStyle(PALETTE.waterDeep);
+      g.fillRoundedRect(l, t, s, s, 6);
+      g.fillStyle(PALETTE.water);
+      g.fillRoundedRect(l + 3, t + 3, s - 6, s - 6, 5);
+      g.lineStyle(2.5, 0xd9f0ff, 0.8);
+      g.beginPath();
+      g.moveTo(l + 8, t + 18);
+      g.lineTo(l + 16, t + 14);
+      g.lineTo(l + 24, t + 18);
+      g.lineTo(l + 32, t + 14);
+      g.strokePath();
+    } else if (tool === 'erase') {
+      g.fillStyle(PALETTE.grassA);
+      g.fillRoundedRect(l, t, s / 2, s, { tl: 6, tr: 0, br: 0, bl: 6 });
+      g.fillStyle(PALETTE.grassB);
+      g.fillRoundedRect(l + s / 2, t, s / 2, s, { tl: 0, tr: 6, br: 6, bl: 0 });
+    } else if (tool === 'tee') {
+      g.fillStyle(PALETTE.grassB);
+      g.fillRoundedRect(l, t, s, s, 6);
+      g.fillStyle(0xffffff);
+      g.fillCircle(x, y, 10);
+      g.lineStyle(2, 0xffffff, 0.5);
+      g.strokeCircle(x, y, 16);
+    } else {
+      g.fillStyle(PALETTE.grassB);
+      g.fillRoundedRect(l, t, s, s, 6);
+      g.fillStyle(0x1a1a1a);
+      g.fillCircle(x, y + 6, 9);
+      g.fillStyle(0xf5f0e6);
+      g.fillRect(x - 1, y - 18, 2.5, 24);
+      g.fillStyle(PALETTE.accent);
+      g.fillTriangle(x + 1, y - 18, x + 1, y - 8, x + 13, y - 13);
+    }
   }
 
   private selectTool(t: Tool) {
@@ -269,8 +317,8 @@ export class BuildScene extends Scene {
     // any edit invalidates a previous ace proof
     if (this.aceProof) {
       this.aceProof = null;
-      this.publishBtn.setStyle({ backgroundColor: '#666666' });
-      this.statusTxt.setText('Layout changed — ACE it again to publish.');
+      this.publishBtn.setAlpha(0.45);
+      this.statusTxt.setText('Layout changed — ace it again to publish.');
     }
     this.redraw();
   }
@@ -278,7 +326,7 @@ export class BuildScene extends Scene {
   private testRun() {
     const err = validateLayout(this.layout);
     if (err) {
-      this.statusTxt.setText(`⚠️ ${err}`);
+      this.statusTxt.setText(err);
       return;
     }
     const layout: HoleLayout = {
@@ -299,7 +347,7 @@ export class BuildScene extends Scene {
 
   private publish() {
     if (!this.aceProof) {
-      this.statusTxt.setText('🔒 Ace your own hole first — that proves it’s beatable!');
+      this.statusTxt.setText('Ace your own hole first — that proves it can be beaten!');
       return;
     }
     const name = this.pickName();
@@ -314,11 +362,11 @@ export class BuildScene extends Scene {
         if (res.ok) {
           this.scene.start('World');
         } else {
-          this.statusTxt.setText(`⚠️ ${res.error ?? 'publish failed'}`);
+          this.statusTxt.setText(res.error ?? 'publish failed');
         }
       } catch (e) {
         console.error('publish failed', e);
-        this.statusTxt.setText('⚠️ publish failed — try again');
+        this.statusTxt.setText('publish failed — try again');
       }
     })();
   }

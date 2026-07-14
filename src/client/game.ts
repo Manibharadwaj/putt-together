@@ -4,11 +4,12 @@ import { WorldScene } from './scenes/WorldScene';
 import { PlayScene } from './scenes/PlayScene';
 import { BuildScene } from './scenes/BuildScene';
 import { WORLD_W, WORLD_H } from '../shared/physics';
+import { loadFont } from './ui';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: AUTO,
   parent: 'game-container',
-  backgroundColor: '#24541f',
+  backgroundColor: '#16381a',
   scale: {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -19,5 +20,7 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-  new Game(config);
+  void loadFont().then(() => {
+    new Game(config);
+  });
 });
