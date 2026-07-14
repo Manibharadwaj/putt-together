@@ -47,5 +47,13 @@
   },
   "dev": {
     "subreddit": "putt_together_gam_dev"
+  },
+  "scheduler": {
+    "tasks": {
+      "daily-tee-off": {
+        "endpoint": "/internal/scheduler/daily",
+        "cron": "0 6 * * *"
+      }
+    }
   }
 }
