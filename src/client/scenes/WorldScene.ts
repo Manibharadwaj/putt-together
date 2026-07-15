@@ -22,6 +22,7 @@ export class WorldScene extends Scene {
 
   create() {
     this.cameras.main.setBackgroundColor(PALETTE.fairwayDarker);
+    this.cameras.main.fadeIn(240, 10, 30, 12);
     this.drawBackground();
     this.content = this.add.container(0, 0);
     this.fitCamera();
@@ -213,7 +214,19 @@ export class WorldScene extends Scene {
         affG.fillTriangle(left + cardW - 60, cy - 12, left + cardW - 60, cy + 12, left + cardW - 38, cy);
       }
 
-      this.content.add([cardG, hit, mini, num, name, author, medal, rec, affG]);
+      // each card slides up into place, staggered down the list
+      const cardC = this.add.container(0, 36);
+      cardC.add([cardG, hit, mini, num, name, author, medal, rec, affG]);
+      cardC.setAlpha(0);
+      this.tweens.add({
+        targets: cardC,
+        alpha: 1,
+        y: 0,
+        duration: 340,
+        ease: 'Cubic.out',
+        delay: 60 + Math.min(i, 8) * 55,
+      });
+      this.content.add(cardC);
     });
 
     if (w.holes.length === 0) {
@@ -249,6 +262,15 @@ export class WorldScene extends Scene {
       }
     );
     this.content.add(build);
+    // heartbeat on the call-to-action
+    this.tweens.add({
+      targets: build,
+      scale: 1.025,
+      duration: 850,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+    });
 
     this.maxScroll = Math.max(0, by + 130 - WORLD_H);
     this.applyScroll();

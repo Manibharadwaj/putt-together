@@ -120,10 +120,19 @@ export class PlayScene extends Scene {
     this.ghostRunning = false;
   }
 
+  private flagPennant!: Phaser.GameObjects.Graphics;
+  private cupPulse!: Phaser.GameObjects.Graphics;
+  private waterG!: Phaser.GameObjects.Graphics;
+  private waterCells: Vec2[] = [];
+  private aimPhase = 0;
+  private trailTick = 0;
+
   create() {
     const cam = this.cameras.main;
     cam.setBackgroundColor(0x2e6b28);
+    cam.fadeIn(240, 10, 30, 12);
     this.drawCourse();
+    this.startAmbient();
 
     this.ballPos = cellCenter(this.layout.tee);
     this.ballShadow = this.add
@@ -238,13 +247,74 @@ export class PlayScene extends Scene {
     g.fillEllipse(cup.x, cup.y + 3, CUP_R * 2.3, CUP_R * 1.6);
     g.fillStyle(COLORS.cup);
     g.fillCircle(cup.x, cup.y, CUP_R);
-    // flag
-    const flag = this.add.graphics().setDepth(3);
-    flag.lineStyle(4, 0xf5f5f5).lineBetween(cup.x, cup.y, cup.x, cup.y - 74);
-    flag.fillStyle(0xe63946).fillTriangle(cup.x, cup.y - 74, cup.x, cup.y - 48, cup.x + 40, cup.y - 61);
+    // flag pole (static) + waving pennant (animated in startAmbient)
+    const pole = this.add.graphics().setDepth(3);
+    pole.lineStyle(4, 0xf5f5f5).lineBetween(cup.x, cup.y, cup.x, cup.y - 74);
+    this.flagPennant = this.add.graphics().setDepth(3);
+    this.flagPennant.setPosition(cup.x, cup.y - 74);
+    this.flagPennant.fillStyle(0xe6503f);
+    this.flagPennant.fillTriangle(0, 0, 0, 26, 40, 13);
     // tee marker
     const tee = cellCenter(this.layout.tee);
     g.lineStyle(3, 0xffffff, 0.55).strokeCircle(tee.x, tee.y, BALL_R + 8);
+  }
+
+  // ambient motion: the course is alive even when nobody touches it
+  private startAmbient() {
+    // pennant flutter
+    this.tweens.add({
+      targets: this.flagPennant,
+      scaleX: 0.72,
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+    });
+    // inviting pulse ring around the cup
+    const cup = cellCenter(this.layout.cup);
+    this.cupPulse = this.add.graphics().setDepth(2);
+    this.cupPulse.lineStyle(4, 0xffffff, 0.5);
+    this.cupPulse.strokeCircle(0, 0, CUP_R + 4);
+    this.cupPulse.setPosition(cup.x, cup.y);
+    this.tweens.add({
+      targets: this.cupPulse,
+      scale: 1.8,
+      alpha: 0,
+      duration: 1400,
+      repeat: -1,
+      ease: 'Quad.out',
+    });
+    // shimmering water
+    this.waterCells = [];
+    for (let r = 0; r < GRID_ROWS; r++) {
+      for (let c = 0; c < GRID_COLS; c++) {
+        if (this.layout.cells[r * GRID_COLS + c] === TILE.WATER) {
+          this.waterCells.push({ x: c, y: r });
+        }
+      }
+    }
+    this.waterG = this.add.graphics().setDepth(1);
+  }
+
+  private drawWater(time: number) {
+    if (this.waterCells.length === 0) return;
+    const g = this.waterG;
+    g.clear();
+    g.lineStyle(2.5, 0xd9f0ff, 0.55);
+    for (const cell of this.waterCells) {
+      const x0 = cell.x * CELL;
+      const y0 = cell.y * CELL;
+      const ph = time / 500 + cell.x * 1.3 + cell.y * 0.9;
+      for (let i = 0; i < 2; i++) {
+        const wy = y0 + 20 + i * 24 + Math.sin(ph + i * 2) * 4;
+        g.beginPath();
+        g.moveTo(x0 + 10, wy);
+        g.lineTo(x0 + 22, wy - 4);
+        g.lineTo(x0 + 34, wy);
+        g.lineTo(x0 + 46, wy - 4);
+        g.strokePath();
+      }
+    }
   }
 
   private setupInput() {
@@ -296,7 +366,7 @@ export class PlayScene extends Scene {
     );
     const tint = Phaser.Display.Color.GetColor(color.r, color.g, color.b);
     for (let i = 1; i <= dots; i++) {
-      const d = i * 26;
+      const d = i * 26 + this.aimPhase;
       g.fillStyle(tint, 1 - i / (dots + 4));
       g.fillCircle(this.ballPos.x + (v.x / power) * d, this.ballPos.y + (v.y / power) * d, 7 - i * 0.28);
     }
@@ -319,7 +389,26 @@ export class PlayScene extends Scene {
     this.ghostRunning = true; // ghost race starts on first flick
   }
 
-  override update() {
+  override update(time: number) {
+    this.drawWater(time);
+    // marching aim dots while aiming
+    if (this.aiming) {
+      this.aimPhase = (this.aimPhase + 0.8) % 26;
+      this.drawAim();
+    }
+    // rolling ball leaves a fading trail
+    if (this.rolling && ++this.trailTick % 3 === 0) {
+      const dot = this.add
+        .circle(this.ballPos.x, this.ballPos.y, BALL_R * 0.55, 0xffffff, 0.28)
+        .setDepth(3);
+      this.tweens.add({
+        targets: dot,
+        alpha: 0,
+        scale: 0.2,
+        duration: 300,
+        onComplete: () => dot.destroy(),
+      });
+    }
     // ghost replay advances at match pace whenever running
     if (this.ghostRunning && this.ghostBall && this.ghostIndex < this.ghostPath.length - 1) {
       this.ghostIndex = Math.min(this.ghostIndex + 2, this.ghostPath.length - 1);
@@ -354,6 +443,9 @@ export class PlayScene extends Scene {
       sfx.bounce();
       this.cameras.main.shake(60, 0.004);
       this.puff(pos, 0xffffff, 4);
+      // squash & stretch on impact
+      this.ball.setScale(1.3, 0.75);
+      this.tweens.add({ targets: this.ball, scaleX: 1, scaleY: 1, duration: 180, ease: 'Back.out' });
     } else if (type === 'water') {
       sfx.splash();
       this.puff(pos, 0x9bd4f5, 12);
@@ -490,6 +582,22 @@ export class PlayScene extends Scene {
       .setScale(0.2);
     this.tweens.add({ targets: head, scale: 1, duration: 400, ease: 'Back.out', delay: 150 });
     if (newRecord) this.cameras.main.shake(180, 0.007);
+
+    // rotating sunburst behind the stars
+    const rays = this.add.graphics().setDepth(20).setAlpha(0);
+    rays.setPosition(cx, cy - 80);
+    rays.fillStyle(PALETTE.gold, 0.12);
+    for (let i = 0; i < 12; i++) {
+      const a0 = (i * Math.PI) / 6;
+      const a1 = a0 + Math.PI / 14;
+      rays.fillTriangle(
+        0, 0,
+        Math.cos(a0) * 260, Math.sin(a0) * 260,
+        Math.cos(a1) * 260, Math.sin(a1) * 260
+      );
+    }
+    this.tweens.add({ targets: rays, alpha: 1, duration: 500, delay: 400 });
+    this.tweens.add({ targets: rays, angle: 360, duration: 14000, repeat: -1 });
 
     // stars: 3 = ace or record, 2 = par or better, 1 = finished
     const stars = this.strokes === 1 || newRecord ? 3 : this.strokes <= 2 ? 2 : 1;

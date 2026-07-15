@@ -63,6 +63,7 @@ export class BuildScene extends Scene {
 
   create() {
     this.cameras.main.setBackgroundColor(0x1e4519);
+    this.cameras.main.fadeIn(240, 10, 30, 12);
     this.fitCamera();
     this.scale.on('resize', () => this.fitCamera());
 
@@ -258,6 +259,10 @@ export class BuildScene extends Scene {
     this.tool = t;
     for (const [key, btn] of this.toolButtons) {
       btn.setStrokeStyle(key === t ? 6 : 4, 0xffffff, key === t ? 1 : 0.35);
+      if (key === t) {
+        btn.setScale(0.9);
+        this.tweens.add({ targets: btn, scale: 1, duration: 200, ease: 'Back.out' });
+      }
     }
   }
 
