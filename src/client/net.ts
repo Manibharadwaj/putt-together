@@ -16,8 +16,14 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+export type LeaderboardResponse = {
+  rows: { username: string; points: number }[];
+  me: string;
+};
+
 export const api = {
   world: () => req<WorldResponse>('/api/world'),
+  leaderboard: () => req<LeaderboardResponse>('/api/leaderboard'),
   hole: (id: string) => req<HoleResponse>(`/api/hole/${id}`),
   submitRun: (body: ShotResultRequest) =>
     req<ShotResultResponse>('/api/shot', {

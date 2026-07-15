@@ -24,6 +24,7 @@ import {
   getUser,
   saveUser,
   touchToday,
+  topPlayers,
 } from '../core/store';
 import { redis } from '@devvit/web/server';
 import { SEED_HOLES } from '../core/seeds';
@@ -277,4 +278,11 @@ api.get('/me', async (c) => {
   const username = await currentUsername();
   const me = await getUser(username);
   return c.json(me);
+});
+
+// ── Leaderboard: top putters by points ──────────────────────────
+api.get('/leaderboard', async (c) => {
+  const username = await currentUsername();
+  const rows = await topPlayers(10);
+  return c.json({ rows, me: username });
 });

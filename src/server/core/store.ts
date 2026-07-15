@@ -78,6 +78,15 @@ export async function getUser(username: string): Promise<UserState> {
 
 export async function saveUser(u: UserState): Promise<void> {
   await redis.set(`user:${u.username}`, JSON.stringify(u));
+  // keep the global leaderboard in sync
+  await redis.zAdd('lb:points', { member: u.username, score: u.points });
+}
+
+export type LeaderboardRow = { username: string; points: number };
+
+export async function topPlayers(n: number): Promise<LeaderboardRow[]> {
+  const rows = await redis.zRange('lb:points', 0, n - 1, { by: 'rank', reverse: true });
+  return rows.map((r) => ({ username: r.member, points: r.score }));
 }
 
 // Marks activity today: consumes tokens, bumps streak on first play of day.

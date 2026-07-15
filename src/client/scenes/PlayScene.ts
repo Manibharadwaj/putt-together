@@ -162,6 +162,64 @@ export class PlayScene extends Scene {
     if (this.holeId) {
       drawBack(this, () => this.scene.start('World'));
     }
+
+    this.maybeShowTutorial();
+  }
+
+  // One-time "how to putt" coach mark: a ghost hand pulls back from the
+  // ball over and over until the player's first real drag.
+  private maybeShowTutorial() {
+    try {
+      if (localStorage.getItem('pt_tut')) return;
+    } catch {
+      /* storage unavailable → still show once per session */
+    }
+    const bx = this.ballPos.x;
+    const by = this.ballPos.y;
+    const group: Phaser.GameObjects.GameObject[] = [];
+
+    const label = this.add
+      .text(WORLD_W / 2, by - 130, 'PULL BACK & RELEASE TO PUTT', {
+        fontFamily: FONT,
+        fontSize: 30,
+        color: HEX.white,
+        stroke: '#000000',
+        strokeThickness: 8,
+      })
+      .setOrigin(0.5)
+      .setDepth(15);
+    this.tweens.add({ targets: label, alpha: 0.55, duration: 700, yoyo: true, repeat: -1 });
+
+    // finger dot that repeatedly drags back from the ball
+    const finger = this.add.circle(bx, by, 17, 0xffffff, 0.85).setDepth(15);
+    finger.setStrokeStyle(4, 0x000000, 0.25);
+    const line = this.add.graphics().setDepth(14);
+    const tween = this.tweens.add({
+      targets: finger,
+      x: bx + 90,
+      y: by + 120,
+      duration: 900,
+      repeat: -1,
+      repeatDelay: 350,
+      ease: 'Quad.inOut',
+      onUpdate: () => {
+        line.clear();
+        line.lineStyle(5, 0xffffff, 0.5);
+        line.lineBetween(bx, by, finger.x, finger.y);
+      },
+    });
+    group.push(label, finger, line);
+
+    const dismiss = () => {
+      tween.stop();
+      group.forEach((o) => o.destroy());
+      try {
+        localStorage.setItem('pt_tut', '1');
+      } catch {
+        /* fine */
+      }
+    };
+    this.input.once('pointerdown', dismiss);
   }
 
   // Pre-simulate the record run into one continuous path with pauses

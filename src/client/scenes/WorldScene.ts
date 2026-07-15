@@ -133,13 +133,32 @@ export class WorldScene extends Scene {
     chipG.fillRoundedRect(WORLD_W / 2 - 310, 138, 620, 44, 22);
     const stats = this.add
       .text(
-        WORLD_W / 2,
+        WORLD_W / 2 - 30,
         160,
         `u/${w.me.username}    ${w.me.points} pts    energy ${w.me.tokens}/10    streak ${w.me.streak}`,
         { fontFamily: FONT, fontSize: 20, color: HEX.gold }
       )
       .setOrigin(0.5);
-    this.content.add([flag, title, sub, chipG, stats]);
+    // trophy button → leaderboard
+    const trophy = this.add.container(WORLD_W / 2 + 275, 160);
+    const tg = this.add.graphics();
+    tg.fillStyle(PALETTE.gold);
+    tg.fillRoundedRect(-14, -12, 28, 16, 5); // cup body
+    tg.fillRect(-4, 4, 8, 8); // stem
+    tg.fillRoundedRect(-12, 12, 24, 5, 2); // base
+    tg.lineStyle(4, PALETTE.gold);
+    tg.beginPath();
+    tg.arc(-16, -6, 6, Math.PI * 0.5, Math.PI * 1.5);
+    tg.strokePath();
+    tg.beginPath();
+    tg.arc(16, -6, 6, -Math.PI * 0.5, Math.PI * 0.5);
+    tg.strokePath();
+    trophy.add(tg);
+    trophy.setSize(56, 48).setInteractive({ useHandCursor: true });
+    trophy.on('pointerup', () => {
+      if (this.dragMoved <= 12) this.showLeaderboard();
+    });
+    this.content.add([flag, title, sub, chipG, stats, trophy]);
 
     // ── themed course sections ──
     const cardW = 700;
@@ -357,6 +376,92 @@ export class WorldScene extends Scene {
       this.content.add(cardC);
       return cy;
     }
+  }
+
+  // top-10 leaderboard overlay (fixed to camera, not the scroll list)
+  private showLeaderboard() {
+    void (async () => {
+      let data: { rows: { username: string; points: number }[]; me: string };
+      try {
+        data = await api.leaderboard();
+      } catch (e) {
+        console.error('leaderboard failed', e);
+        return;
+      }
+      const cx = WORLD_W / 2;
+      const cy = WORLD_H / 2;
+      const group: Phaser.GameObjects.GameObject[] = [];
+
+      const dim = this.add
+        .rectangle(cx, cy, WORLD_W * 2, WORLD_H * 2, 0x000000, 0.6)
+        .setDepth(40)
+        .setInteractive();
+      const panel = this.add.graphics().setDepth(41);
+      panel.fillStyle(0x000000, 0.3);
+      panel.fillRoundedRect(cx - 285, cy - 335, 580, 690, 26);
+      panel.fillStyle(PALETTE.cream);
+      panel.fillRoundedRect(cx - 290, cy - 340, 580, 690, 26);
+      panel.fillStyle(PALETTE.gold);
+      panel.fillRoundedRect(cx - 290, cy - 340, 580, 84, { tl: 26, tr: 26, br: 0, bl: 0 });
+      const heading = this.add
+        .text(cx, cy - 298, 'TOP PUTTERS', { fontFamily: FONT, fontSize: 34, color: HEX.white })
+        .setOrigin(0.5)
+        .setDepth(42);
+      group.push(dim, panel, heading);
+
+      const medals = [0xf2b010, 0xb9c0c8, 0xc98a4b];
+      data.rows.forEach((row, i) => {
+        const ry = cy - 220 + i * 52;
+        const isMe = row.username === data.me;
+        if (isMe) {
+          const hl = this.add.graphics().setDepth(41);
+          hl.fillStyle(0xffe9b0, 0.9);
+          hl.fillRoundedRect(cx - 270, ry - 22, 540, 44, 10);
+          group.push(hl);
+        }
+        const rankColor = i < 3 ? medals[i]! : 0xd9cdb8;
+        const dot = this.add.circle(cx - 240, ry, 15, rankColor).setDepth(42);
+        const rank = this.add
+          .text(cx - 240, ry - 1, `${i + 1}`, { fontFamily: FONT, fontSize: 18, color: '#ffffff' })
+          .setOrigin(0.5)
+          .setDepth(43);
+        const nm = this.add
+          .text(cx - 205, ry, `u/${row.username}`, {
+            fontFamily: FONT,
+            fontSize: 24,
+            color: isMe ? '#a9720a' : '#2b2118',
+          })
+          .setOrigin(0, 0.5)
+          .setDepth(42);
+        const pts = this.add
+          .text(cx + 250, ry, `${row.points}`, { fontFamily: FONT, fontSize: 24, color: '#a9720a' })
+          .setOrigin(1, 0.5)
+          .setDepth(42);
+        group.push(dot, rank, nm, pts);
+      });
+      if (data.rows.length === 0) {
+        group.push(
+          this.add
+            .text(cx, cy - 60, 'No scores yet — go putt!', {
+              fontFamily: FONT,
+              fontSize: 26,
+              color: HEX.inkSoft,
+            })
+            .setOrigin(0.5)
+            .setDepth(42)
+        );
+      }
+
+      const close = drawButton(
+        this,
+        cx,
+        cy + 290,
+        { w: 240, h: 70, fill: PALETTE.accent, fillDark: PALETTE.accentDark, label: 'CLOSE', size: 26 },
+        () => group.forEach((o) => o.destroy())
+      ).setDepth(43);
+      group.push(close);
+      dim.on('pointerup', () => group.forEach((o) => o.destroy()));
+    })();
   }
 
   private playHole(id: string, theme: WorldHole['theme']) {
