@@ -19,9 +19,20 @@
   align-items: center;
   height: 100vh;
   margin: 0;
-  gap: 18px;
+  gap: clamp(8px, 2.4vh, 18px);
   background: radial-gradient(ellipse at 50% 120%, #2e6b28 0%, #1d4a18 65%, #143611 100%);
   overflow: hidden;
+}
+
+/* compact inline view on phones: shrink the vignette, keep CTA huge */
+@media (max-height: 420px) {
+  .green {
+    transform: scale(0.62);
+    margin: -18px 0;
+  }
+  .description {
+    display: none;
+  }
 }
 
 /* a tiny golf vignette drawn in pure CSS */
@@ -107,7 +118,7 @@
 }
 
 .title {
-  font-size: 2.4em;
+  font-size: clamp(1.6em, 6vw, 2.4em);
   font-weight: 400;
   text-align: center;
   color: #fff8ec;

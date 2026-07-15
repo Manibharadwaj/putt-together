@@ -180,7 +180,7 @@ export class WorldScene extends Scene {
       const author = this.add
         .text(left + 152, cy + 2, `built by u/${h.author}  ·  ${h.plays} plays`, {
           fontFamily: FONT,
-          fontSize: 18,
+          fontSize: 20,
           color: HEX.inkSoft,
         })
         .setOrigin(0, 0.5);
@@ -194,7 +194,7 @@ export class WorldScene extends Scene {
       const rec = this.add
         .text(left + 182, cy + 40, recStr, {
           fontFamily: FONT,
-          fontSize: 19,
+          fontSize: 21,
           color: '#a97d0a',
         })
         .setOrigin(0, 0.5);

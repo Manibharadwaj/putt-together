@@ -55,5 +55,8 @@
         "cron": "0 6 * * *"
       }
     }
+  },
+  "marketingAssets": {
+    "icon": "assets-icon.png"
   }
 }

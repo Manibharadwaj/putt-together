@@ -169,7 +169,7 @@ export class BuildScene extends Scene {
       const sw = this.add.graphics();
       this.drawSwatch(sw, x, y - 12, t.key);
       const label = this.add
-        .text(x, y + 26, t.label, { fontFamily: FONT, fontSize: 15, color: HEX.cream })
+        .text(x, y + 27, t.label, { fontFamily: FONT, fontSize: 18, color: HEX.cream })
         .setOrigin(0.5);
       btn.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
         sfx.click();
