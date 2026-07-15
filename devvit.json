@@ -21,22 +21,19 @@
     "items": [
       {
         "label": "Create a new post",
-        "description": "putt-together-game",
+        "description": "Create the Putt Together game post",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/post-create"
       },
       {
-        "label": "Example form",
-        "description": "Show a simple form",
+        "label": "Reset world (admin)",
+        "description": "Wipe all holes, records and scores; reseeds fresh",
         "location": "subreddit",
         "forUserType": "moderator",
-        "endpoint": "/internal/menu/example-form"
+        "endpoint": "/internal/menu/reset-world"
       }
     ]
-  },
-  "forms": {
-    "exampleForm": "/internal/form/example-submit"
   },
   "triggers": {
     "onAppInstall": "/internal/triggers/on-app-install"
