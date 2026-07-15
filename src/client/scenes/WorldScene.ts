@@ -1,10 +1,10 @@
 import * as Phaser from 'phaser';
 import { Scene } from 'phaser';
-import type { WorldResponse } from '../../shared/types';
+import type { WorldResponse, WorldHole } from '../../shared/types';
 import { GRID_COLS, GRID_ROWS, TILE } from '../../shared/types';
 import { WORLD_W, WORLD_H } from '../../shared/physics';
 import { api } from '../net';
-import { FONT, HEX, PALETTE, drawButton, drawFlag } from '../ui';
+import { FONT, HEX, PALETTE, THEMES, drawButton, drawFlag } from '../ui';
 
 // The clubhouse: a scrolling list of hole cards, each with a live
 // mini-render of its actual layout. Tap to play; the BUILD card at the
@@ -90,7 +90,15 @@ export class WorldScene extends Scene {
       for (let c = 0; c < GRID_COLS; c++) {
         const t = cells[r * GRID_COLS + c];
         if (t === TILE.GRASS) continue;
-        g.fillStyle(t === TILE.WALL ? PALETTE.wall : t === TILE.SAND ? PALETTE.sand : PALETTE.water);
+        g.fillStyle(
+          t === TILE.WALL
+            ? PALETTE.wall
+            : t === TILE.SAND
+              ? PALETTE.sand
+              : t === TILE.ICE
+                ? 0xd6f0f5
+                : PALETTE.water
+        );
         g.fillRect(x + c * cw, y + r * ch, cw + 0.5, ch + 0.5);
       }
     }
@@ -100,6 +108,7 @@ export class WorldScene extends Scene {
   private render() {
     const w = this.world!;
     this.content.removeAll(true);
+    const totalHoles = w.courses.reduce((s, c) => s + c.holes.length, 0);
 
     // ── header: drawn flag + wordmark ──
     const flag = drawFlag(this, WORLD_W / 2 - 205, 62, 0.9);
@@ -111,7 +120,7 @@ export class WorldScene extends Scene {
       })
       .setOrigin(0.5);
     const sub = this.add
-      .text(WORLD_W / 2, 112, `${w.holes.length} holes — every one built & aced by a player`, {
+      .text(WORLD_W / 2, 112, `${totalHoles} holes — every one built & aced by a player`, {
         fontFamily: FONT,
         fontSize: 21,
         color: HEX.paleGreen,
@@ -132,16 +141,135 @@ export class WorldScene extends Scene {
       .setOrigin(0.5);
     this.content.add([flag, title, sub, chipG, stats]);
 
-    // ── hole cards ──
+    // ── themed course sections ──
     const cardW = 700;
     const cardH = 148;
     const gap = 20;
-    const startY = 268;
-    w.holes.forEach((h, i) => {
-      const cx = WORLD_W / 2;
-      const cy = startY + i * (cardH + gap);
+    let y = 268;
+    let cardIndex = 0;
+
+    for (const course of w.courses) {
+      if (course.theme === 'community' || course.holes.length > 0 || course.locked) {
+        // course banner
+        const theme = THEMES[course.theme];
+        const bannerG = this.add.graphics();
+        bannerG.fillStyle(theme.header, course.locked ? 0.45 : 0.95);
+        bannerG.fillRoundedRect(WORLD_W / 2 - cardW / 2, y - 34, cardW, 68, 18);
+        const done = course.holes.filter((h) => h.completedByMe).length;
+        const progress = course.locked
+          ? ''
+          : course.theme === 'community'
+            ? `${course.holes.length} built`
+            : `${done}/${course.holes.length}`;
+        const bannerTitle = this.add
+          .text(WORLD_W / 2 - cardW / 2 + 28, y, course.title.toUpperCase(), {
+            fontFamily: FONT,
+            fontSize: 30,
+            color: course.locked ? '#ffffff88' : HEX.white,
+          })
+          .setOrigin(0, 0.5);
+        const bannerRight = this.add
+          .text(WORLD_W / 2 + cardW / 2 - 28, y, progress, {
+            fontFamily: FONT,
+            fontSize: 24,
+            color: '#ffffffcc',
+          })
+          .setOrigin(1, 0.5);
+        this.content.add([bannerG, bannerTitle, bannerRight]);
+
+        if (course.locked) {
+          // drawn padlock + unlock hint
+          const lockG = this.add.graphics();
+          const lx = WORLD_W / 2 + cardW / 2 - 40;
+          lockG.fillStyle(0xffffff, 0.9);
+          lockG.fillRoundedRect(lx - 13, y - 4, 26, 20, 5);
+          lockG.lineStyle(5, 0xffffff, 0.9);
+          lockG.beginPath();
+          lockG.arc(lx, y - 5, 9, Math.PI, 0);
+          lockG.strokePath();
+          const hint = this.add
+            .text(WORLD_W / 2, y + 56, course.unlockHint, {
+              fontFamily: FONT,
+              fontSize: 20,
+              color: '#ffffff77',
+            })
+            .setOrigin(0.5);
+          this.content.add([lockG, hint]);
+          y += 130;
+          continue;
+        }
+        y += 76;
+      }
+
+      course.holes.forEach((h, holeIdx) => {
+        const i = cardIndex++;
+        const cy = this.renderCard(h, holeIdx, i, y, cardW, cardH);
+        void cy;
+        y += cardH + gap;
+      });
+
+      if (course.theme === 'community' && course.holes.length === 0) {
+        const empty = this.add
+          .text(WORLD_W / 2, y + 10, 'No community holes yet.\nBe the first — build one below!', {
+            fontFamily: FONT,
+            fontSize: 26,
+            color: HEX.paleGreen,
+            align: 'center',
+          })
+          .setOrigin(0.5);
+        this.content.add(empty);
+        y += 110;
+      }
+    }
+
+    // ── build button at the end ──
+    const by = y + 40;
+    const build = drawButton(
+      this,
+      WORLD_W / 2,
+      by,
+      {
+        w: 700,
+        h: 108,
+        fill: PALETTE.accent,
+        fillDark: PALETTE.accentDark,
+        label: 'BUILD A HOLE',
+        size: 36,
+        sub: 'design it — ace it — own it',
+      },
+      () => {
+        if (this.dragMoved > 12) return;
+        this.scene.start('Build');
+      }
+    );
+    this.content.add(build);
+    // heartbeat on the call-to-action
+    this.tweens.add({
+      targets: build,
+      scale: 1.025,
+      duration: 850,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+    });
+
+    this.maxScroll = Math.max(0, by + 130 - WORLD_H);
+    this.applyScroll();
+  }
+
+  // renders one hole card at vertical offset `top`; returns center y
+  private renderCard(
+    h: WorldHole,
+    holeIdx: number,
+    i: number,
+    top: number,
+    cardW: number,
+    cardH: number
+  ): number {
+    {
+      const cy = top + cardH / 2;
       const done = h.completedByMe;
-      const left = cx - cardW / 2;
+      const left = WORLD_W / 2 - cardW / 2;
 
       const cardG = this.add.graphics();
       // drop shadow
@@ -156,15 +284,15 @@ export class WorldScene extends Scene {
 
       // tap zone
       const hit = this.add
-        .rectangle(cx, cy, cardW, cardH, 0xffffff, 0.001)
+        .rectangle(WORLD_W / 2, cy, cardW, cardH, 0xffffff, 0.001)
         .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => this.playHole(h.id));
+        .on('pointerup', () => this.playHole(h.id, h.theme));
 
       // mini layout preview
       const mini = this.miniMap(left + 28, cy - cardH / 2 + 14, h.layout.cells, 90, 120);
 
       const num = this.add
-        .text(left + 152, cy - 40, `${i + 1}`.padStart(2, '0'), {
+        .text(left + 152, cy - 40, `${holeIdx + 1}`.padStart(2, '0'), {
           fontFamily: FONT,
           fontSize: 40,
           color: done ? '#58a14e' : '#d9c9a8',
@@ -227,56 +355,11 @@ export class WorldScene extends Scene {
         delay: 60 + Math.min(i, 8) * 55,
       });
       this.content.add(cardC);
-    });
-
-    if (w.holes.length === 0) {
-      const empty = this.add
-        .text(WORLD_W / 2, 400, 'The course is empty.\nBe the first to build a hole!', {
-          fontFamily: FONT,
-          fontSize: 32,
-          color: HEX.cream,
-          align: 'center',
-        })
-        .setOrigin(0.5);
-      this.content.add(empty);
+      return cy;
     }
-
-    // ── build button at the end ──
-    const by = startY + w.holes.length * (cardH + gap) + 40;
-    const build = drawButton(
-      this,
-      WORLD_W / 2,
-      by,
-      {
-        w: 700,
-        h: 108,
-        fill: PALETTE.accent,
-        fillDark: PALETTE.accentDark,
-        label: `BUILD HOLE ${w.holes.length + 1}`,
-        size: 36,
-        sub: 'design it — ace it — own it',
-      },
-      () => {
-        if (this.dragMoved > 12) return;
-        this.scene.start('Build');
-      }
-    );
-    this.content.add(build);
-    // heartbeat on the call-to-action
-    this.tweens.add({
-      targets: build,
-      scale: 1.025,
-      duration: 850,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.inOut',
-    });
-
-    this.maxScroll = Math.max(0, by + 130 - WORLD_H);
-    this.applyScroll();
   }
 
-  private playHole(id: string) {
+  private playHole(id: string, theme: WorldHole['theme']) {
     if (this.dragMoved > 12) return; // it was a scroll, not a tap
     void (async () => {
       try {
@@ -286,6 +369,7 @@ export class WorldScene extends Scene {
           holeName: hole.name,
           holeId: id,
           ghost: record,
+          theme,
         });
       } catch (e) {
         console.error('hole load failed', e);

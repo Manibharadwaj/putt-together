@@ -14,7 +14,7 @@ import { api } from '../net';
 import { FONT, HEX, PALETTE, drawButton, drawBack } from '../ui';
 import { sfx } from '../sound';
 
-type Tool = 'wall' | 'sand' | 'water' | 'erase' | 'tee' | 'cup';
+type Tool = 'wall' | 'sand' | 'water' | 'ice' | 'erase' | 'tee' | 'cup';
 
 export type BuildSceneData = {
   layout?: HoleLayout; // returning from a test run
@@ -128,6 +128,11 @@ export class BuildScene extends Scene {
           g.fillRect(x, y, CELL, CELL);
           g.fillStyle(0x3f9bd8);
           g.fillRoundedRect(x + 3, y + 3, CELL - 6, CELL - 6, 8);
+        } else if (t === TILE.ICE) {
+          g.fillStyle(0xd6f0f5);
+          g.fillRect(x, y, CELL, CELL);
+          g.fillStyle(0xf0fbff, 0.7);
+          g.fillTriangle(x + 8, y + CELL - 8, x + CELL - 8, y + 8, x + CELL - 8, y + CELL - 8);
         }
         // faint grid lines
         g.lineStyle(1, 0x000000, 0.06);
@@ -154,12 +159,13 @@ export class BuildScene extends Scene {
       { key: 'wall', label: 'WALL' },
       { key: 'sand', label: 'SAND' },
       { key: 'water', label: 'WATER' },
+      { key: 'ice', label: 'ICE' },
       { key: 'erase', label: 'GRASS' },
       { key: 'tee', label: 'TEE' },
       { key: 'cup', label: 'CUP' },
     ];
     const y = WORLD_H - UI_H + 46;
-    const w = 100;
+    const w = 88;
     const startX = (WORLD_W - tools.length * (w + 14)) / 2 + w / 2;
     tools.forEach((t, i) => {
       const x = startX + i * (w + 14);
@@ -231,6 +237,11 @@ export class BuildScene extends Scene {
       g.lineTo(l + 24, t + 18);
       g.lineTo(l + 32, t + 14);
       g.strokePath();
+    } else if (tool === 'ice') {
+      g.fillStyle(0xd6f0f5);
+      g.fillRoundedRect(l, t, s, s, 6);
+      g.fillStyle(0xf0fbff, 0.75);
+      g.fillTriangle(l + 6, t + s - 6, l + s - 6, t + 6, l + s - 6, t + s - 6);
     } else if (tool === 'erase') {
       g.fillStyle(PALETTE.grassA);
       g.fillRoundedRect(l, t, s / 2, s, { tl: 6, tr: 0, br: 0, bl: 6 });
@@ -315,7 +326,9 @@ export class BuildScene extends Scene {
             ? TILE.SAND
             : this.tool === 'water'
               ? TILE.WATER
-              : TILE.GRASS;
+              : this.tool === 'ice'
+                ? TILE.ICE
+                : TILE.GRASS;
       if (this.layout.cells[idx] === code) return;
       this.layout.cells[idx] = code;
     }

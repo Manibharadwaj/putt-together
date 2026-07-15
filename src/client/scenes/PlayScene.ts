@@ -12,7 +12,7 @@ import {
 } from '../../shared/types';
 import { api } from '../net';
 import { sfx } from '../sound';
-import { FONT, HEX, PALETTE, drawButton, drawBack } from '../ui';
+import { FONT, HEX, PALETTE, THEMES, type ThemeName, drawButton, drawBack } from '../ui';
 import {
   WORLD_W,
   WORLD_H,
@@ -24,17 +24,14 @@ import {
   type SimResult,
 } from '../../shared/physics';
 
-const COLORS = {
-  grassA: PALETTE.grassA,
-  grassB: PALETTE.grassB,
-  wall: PALETTE.wall,
-  wallTop: PALETTE.wallTop,
+const STATIC_COLORS = {
   sand: PALETTE.sand,
   water: PALETTE.water,
   waterDeep: PALETTE.waterDeep,
+  ice: 0xd6f0f5,
+  iceShine: 0xf0fbff,
   ball: 0xffffff,
   cup: 0x1a1a1a,
-  aim: 0xffffff,
 };
 
 export type PlaySceneData = {
@@ -42,6 +39,7 @@ export type PlaySceneData = {
   holeName?: string;
   holeId?: string; // when set, results are submitted to the server
   ghost?: HoleRecord | null; // record holder's run, replayed as a ghost
+  theme?: ThemeName;
   onFinished?: (strokes: number, shots: Shot[]) => void;
 };
 
@@ -75,6 +73,7 @@ export function testHole(): HoleLayout {
 export class PlayScene extends Scene {
   private layout!: HoleLayout;
   private holeName = 'Test Hole';
+  private theme = THEMES.meadow;
   private holeId: string | undefined;
   private ghost: HoleRecord | null = null;
   private ghostBall: Phaser.GameObjects.Container | null = null;
@@ -106,6 +105,7 @@ export class PlayScene extends Scene {
   init(data: PlaySceneData) {
     this.layout = data.layout ?? testHole();
     this.holeName = data.holeName ?? 'Test Hole';
+    this.theme = THEMES[data.theme ?? 'meadow'];
     this.holeId = data.holeId;
     this.ghost = data.ghost ?? null;
     this.onFinished = data.onFinished;
@@ -129,7 +129,7 @@ export class PlayScene extends Scene {
 
   create() {
     const cam = this.cameras.main;
-    cam.setBackgroundColor(0x2e6b28);
+    cam.setBackgroundColor(this.theme.bg);
     cam.fadeIn(240, 10, 30, 12);
     this.drawCourse();
     this.startAmbient();
@@ -192,7 +192,7 @@ export class PlayScene extends Scene {
 
   private makeBall(): Phaser.GameObjects.Container {
     const c = this.add.container(this.ballPos.x, this.ballPos.y);
-    const body = this.add.circle(0, 0, BALL_R, COLORS.ball);
+    const body = this.add.circle(0, 0, BALL_R, STATIC_COLORS.ball);
     const shine = this.add.circle(-4, -5, BALL_R * 0.32, 0xffffff, 0.9);
     body.setStrokeStyle(2, 0xd8d8d8);
     c.add([body, shine]);
@@ -215,16 +215,21 @@ export class PlayScene extends Scene {
         const x = c * CELL;
         const y = r * CELL;
         // grass checker base everywhere (visible under sand/water edges)
-        g.fillStyle((c + r) % 2 === 0 ? COLORS.grassA : COLORS.grassB);
+        g.fillStyle((c + r) % 2 === 0 ? this.theme.grassA : this.theme.grassB);
         g.fillRect(x, y, CELL, CELL);
         if (t === TILE.SAND) {
-          g.fillStyle(COLORS.sand);
+          g.fillStyle(STATIC_COLORS.sand);
           g.fillRoundedRect(x + 2, y + 2, CELL - 4, CELL - 4, 10);
         } else if (t === TILE.WATER) {
-          g.fillStyle(COLORS.waterDeep);
+          g.fillStyle(STATIC_COLORS.waterDeep);
           g.fillRect(x, y, CELL, CELL);
-          g.fillStyle(COLORS.water);
+          g.fillStyle(STATIC_COLORS.water);
           g.fillRoundedRect(x + 3, y + 3, CELL - 6, CELL - 6, 8);
+        } else if (t === TILE.ICE) {
+          g.fillStyle(STATIC_COLORS.ice);
+          g.fillRect(x, y, CELL, CELL);
+          g.fillStyle(STATIC_COLORS.iceShine, 0.7);
+          g.fillTriangle(x + 8, y + CELL - 8, x + CELL - 8, y + 8, x + CELL - 8, y + CELL - 8);
         }
       }
     }
@@ -235,9 +240,9 @@ export class PlayScene extends Scene {
         if (t !== TILE.WALL) continue;
         const x = c * CELL;
         const y = r * CELL;
-        g.fillStyle(COLORS.wall);
+        g.fillStyle(this.theme.wall);
         g.fillRect(x, y, CELL, CELL);
-        g.fillStyle(COLORS.wallTop);
+        g.fillStyle(this.theme.wallTop);
         g.fillRect(x + 3, y + 3, CELL - 6, CELL - 10);
       }
     }
@@ -245,7 +250,7 @@ export class PlayScene extends Scene {
     const cup = cellCenter(this.layout.cup);
     g.fillStyle(0x000000, 0.35);
     g.fillEllipse(cup.x, cup.y + 3, CUP_R * 2.3, CUP_R * 1.6);
-    g.fillStyle(COLORS.cup);
+    g.fillStyle(STATIC_COLORS.cup);
     g.fillCircle(cup.x, cup.y, CUP_R);
     // flag pole (static) + waving pennant (animated in startAmbient)
     const pole = this.add.graphics().setDepth(3);

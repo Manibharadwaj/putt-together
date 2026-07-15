@@ -125,6 +125,59 @@ export function drawFlag(scene: Phaser.Scene, x: number, y: number, scale = 1): 
   return g;
 }
 
+// Per-course visual themes. Every scene picks its colors from here.
+export type ThemeName = 'meadow' | 'dunes' | 'frost' | 'forest' | 'community';
+export type ThemeColors = {
+  grassA: number;
+  grassB: number;
+  wall: number;
+  wallTop: number;
+  bg: number;
+  header: number; // banner tint on the world map
+};
+export const THEMES: Record<ThemeName, ThemeColors> = {
+  meadow: {
+    grassA: 0x6abf5e,
+    grassB: 0x63b657,
+    wall: 0x4a3423,
+    wallTop: 0x6b4c33,
+    bg: 0x2e6b28,
+    header: 0x3f8f3a,
+  },
+  dunes: {
+    grassA: 0xc9b26a,
+    grassB: 0xc2ab62,
+    wall: 0x8a5a2b,
+    wallTop: 0xa8743c,
+    bg: 0x7a6234,
+    header: 0xb08d3e,
+  },
+  frost: {
+    grassA: 0x9fd8d4,
+    grassB: 0x94cfcb,
+    wall: 0x4a5d78,
+    wallTop: 0x64799a,
+    bg: 0x2c4a5e,
+    header: 0x4a7d96,
+  },
+  forest: {
+    grassA: 0x4e8f45,
+    grassB: 0x47873e,
+    wall: 0x33502c,
+    wallTop: 0x466b3c,
+    bg: 0x1e3d1a,
+    header: 0x2f6329,
+  },
+  community: {
+    grassA: 0x6abf5e,
+    grassB: 0x63b657,
+    wall: 0x4a3423,
+    wallTop: 0x6b4c33,
+    bg: 0x2e6b28,
+    header: 0xe6503f,
+  },
+};
+
 // Back chevron button (‹) drawn, top-left.
 export function drawBack(scene: Phaser.Scene, onTap: () => void): Phaser.GameObjects.Container {
   const c = scene.add.container(52, 46).setDepth(30);

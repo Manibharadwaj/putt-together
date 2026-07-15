@@ -6,8 +6,12 @@ export const TILE = {
   WALL: 1,
   SAND: 2,
   WATER: 3,
+  ICE: 4,
 } as const;
 export type TileCode = (typeof TILE)[keyof typeof TILE];
+
+// Visual theme of a course section
+export type Theme = 'meadow' | 'dunes' | 'frost' | 'forest' | 'community';
 
 // Grid dimensions — portrait-friendly for mobile Reddit
 export const GRID_COLS = 12;
@@ -29,6 +33,7 @@ export type Hole = {
   author: string; // reddit username
   layout: HoleLayout;
   par: number; // author's ace proof sets par reference
+  theme: Theme;
   createdAt: number;
   plays: number;
   aces: number;
@@ -59,17 +64,28 @@ export type UserState = {
 
 // ── API payloads ────────────────────────────────────────────────
 
+export type WorldHole = {
+  id: string;
+  name: string;
+  author: string;
+  par: number;
+  plays: number;
+  theme: Theme;
+  layout: HoleLayout; // used for the card mini-previews
+  record: { holder: string; strokes: number } | null;
+  completedByMe: boolean;
+};
+
+export type WorldCourse = {
+  theme: Theme;
+  title: string;
+  holes: WorldHole[];
+  locked: boolean;
+  unlockHint: string; // e.g. "finish 5 holes in Meadow Springs"
+};
+
 export type WorldResponse = {
-  holes: {
-    id: string;
-    name: string;
-    author: string;
-    par: number;
-    plays: number;
-    layout: HoleLayout; // used for the card mini-previews
-    record: { holder: string; strokes: number } | null;
-    completedByMe: boolean;
-  }[];
+  courses: WorldCourse[];
   me: UserState;
 };
 

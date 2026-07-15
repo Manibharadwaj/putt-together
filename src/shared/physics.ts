@@ -17,6 +17,7 @@ export const MAX_SHOT_SPEED = 34;
 
 const FRICTION_GRASS = 0.9855;
 const FRICTION_SAND = 0.913;
+const FRICTION_ICE = 0.995; // barely slows — the ball sails (worst case still rests inside MAX_TICKS)
 const WALL_RESTITUTION = 0.78;
 export const MAX_TICKS = 60 * 20; // 20s safety cap per shot
 
@@ -112,7 +113,8 @@ export function simulateShot(layout: HoleLayout, shot: Shot): SimResult {
         ticks: tick,
       };
     }
-    const friction = t === TILE.SAND ? FRICTION_SAND : FRICTION_GRASS;
+    const friction =
+      t === TILE.SAND ? FRICTION_SAND : t === TILE.ICE ? FRICTION_ICE : FRICTION_GRASS;
     vx *= friction;
     vy *= friction;
 
@@ -164,7 +166,7 @@ export function validateLayout(layout: HoleLayout): string | null {
   if (!Array.isArray(layout.cells) || layout.cells.length !== GRID_COLS * GRID_ROWS) {
     return 'bad grid size';
   }
-  if (layout.cells.some((c) => c !== 0 && c !== 1 && c !== 2 && c !== 3)) {
+  if (layout.cells.some((c) => c !== 0 && c !== 1 && c !== 2 && c !== 3 && c !== 4)) {
     return 'unknown tile code';
   }
   const inBounds = (p: Vec2) => p.x >= 0 && p.x < GRID_COLS && p.y >= 0 && p.y < GRID_ROWS;

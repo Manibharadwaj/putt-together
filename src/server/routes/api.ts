@@ -2,12 +2,15 @@ import { Hono } from 'hono';
 import { context, reddit } from '@devvit/web/server';
 import type {
   WorldResponse,
+  WorldCourse,
+  WorldHole,
   HoleResponse,
   ShotResultRequest,
   ShotResultResponse,
   PublishHoleRequest,
   PublishHoleResponse,
   Hole,
+  Theme,
 } from '../../shared/types';
 import { validateLayout, validateRun } from '../../shared/physics';
 import {
@@ -32,16 +35,24 @@ export const api = new Hono();
 // the missing holes without disturbing player-built ones.
 async function seedIfEmpty(): Promise<void> {
   // atomic claim — concurrent visitors can't double-seed
-  const claim = await redis.incrBy('world:seedbatch2', 1);
+  const claim = await redis.incrBy('world:seedbatch3', 1);
   if (claim !== 1) return;
   const chain = await getChain();
-  const existing = new Set<string>();
+  const existing = new Map<string, Hole>();
   for (const id of chain) {
     const h = await getHole(id);
-    if (h && h.author === 'putt_together') existing.add(h.name);
+    if (h && h.author === 'putt_together') existing.set(h.name, h);
   }
   for (const s of SEED_HOLES) {
-    if (existing.has(s.name)) continue;
+    const prev = existing.get(s.name);
+    if (prev) {
+      // older batch without themes: stamp the theme in place
+      if (!prev.theme) {
+        prev.theme = s.theme;
+        await saveHole(prev);
+      }
+      continue;
+    }
     const id = await nextHoleId();
     await saveHole({
       id,
@@ -49,6 +60,7 @@ async function seedIfEmpty(): Promise<void> {
       author: 'putt_together',
       layout: s.layout,
       par: 2,
+      theme: s.theme,
       createdAt: Date.now(),
       plays: 0,
       aces: 0,
@@ -63,19 +75,28 @@ async function seedIfEmpty(): Promise<void> {
   }
 }
 
+const COURSE_ORDER: { theme: Theme; title: string }[] = [
+  { theme: 'meadow', title: 'Meadow Springs' },
+  { theme: 'dunes', title: 'Sunbaked Dunes' },
+  { theme: 'frost', title: 'Frostbite Falls' },
+  { theme: 'forest', title: 'Whispering Woods' },
+  { theme: 'community', title: 'Community Course' },
+];
+const UNLOCK_AT = 5; // completions in the previous course
+
 async function currentUsername(): Promise<string> {
   const name = await reddit.getCurrentUsername();
   return name ?? 'anonymous';
 }
 
-// ── World: the full course + my state ───────────────────────────
+// ── World: themed courses + my state ────────────────────────────
 api.get('/world', async (c) => {
   await seedIfEmpty();
   const username = await currentUsername();
   const me = await getUser(username);
   const chain = await getChain();
   const holes = await Promise.all(
-    chain.map(async (id) => {
+    chain.map(async (id): Promise<WorldHole | null> => {
       const [hole, record] = await Promise.all([getHole(id), getRecord(id)]);
       if (!hole) return null;
       return {
@@ -84,16 +105,37 @@ api.get('/world', async (c) => {
         author: hole.author,
         par: hole.par,
         plays: hole.plays,
+        theme: hole.theme ?? 'community',
         layout: hole.layout,
         record: record ? { holder: record.holder, strokes: record.strokes } : null,
         completedByMe: me.completed.includes(hole.id),
       };
     })
   );
-  return c.json<WorldResponse>({
-    holes: holes.filter((h): h is NonNullable<typeof h> => h !== null),
-    me,
-  });
+  const all = holes.filter((h): h is WorldHole => h !== null);
+
+  // progression: each themed course unlocks after UNLOCK_AT clears in the
+  // previous one; the community course is always open.
+  const courses: WorldCourse[] = [];
+  let prevDone = Infinity; // first course always unlocked
+  let prevTitle = '';
+  for (const meta of COURSE_ORDER) {
+    const courseHoles = all.filter((h) => h.theme === meta.theme);
+    const done = courseHoles.filter((h) => h.completedByMe).length;
+    const locked = meta.theme !== 'community' && prevDone < UNLOCK_AT;
+    courses.push({
+      theme: meta.theme,
+      title: meta.title,
+      holes: courseHoles,
+      locked,
+      unlockHint: locked ? `finish ${UNLOCK_AT} holes in ${prevTitle} to unlock` : '',
+    });
+    if (meta.theme !== 'community') {
+      prevDone = done;
+      prevTitle = meta.title;
+    }
+  }
+  return c.json<WorldResponse>({ courses, me });
 });
 
 // ── One hole: layout + record ghost ─────────────────────────────
@@ -199,6 +241,7 @@ api.post('/hole', async (c) => {
     author: username,
     layout: body.layout,
     par: 2, // aceable by construction; par 2 keeps scoring generous
+    theme: 'community',
     createdAt: Date.now(),
     plays: 0,
     aces: 0,
