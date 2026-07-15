@@ -65,7 +65,9 @@ export class BuildScene extends Scene {
     this.cameras.main.setBackgroundColor(0x1e4519);
     this.cameras.main.fadeIn(240, 10, 30, 12);
     this.fitCamera();
-    this.scale.on('resize', () => this.fitCamera());
+    const onResize = () => this.fitCamera();
+    this.scale.on('resize', onResize);
+    this.events.once('shutdown', () => this.scale.off('resize', onResize));
 
     // board (scaled down to leave room for the toolbar)
     this.board = this.add.container(
@@ -100,6 +102,7 @@ export class BuildScene extends Scene {
 
   private fitCamera() {
     const { width, height } = this.scale;
+    if (width < 2 || height < 2) return; // mid-resize the viewport can be 0
     const zoom = Math.min(width / WORLD_W, height / WORLD_H);
     this.cameras.main.setZoom(zoom);
     this.cameras.main.centerOn(WORLD_W / 2, WORLD_H / 2);

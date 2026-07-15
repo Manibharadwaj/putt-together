@@ -26,7 +26,9 @@ export class WorldScene extends Scene {
     this.drawBackground();
     this.content = this.add.container(0, 0);
     this.fitCamera();
-    this.scale.on('resize', () => this.fitCamera());
+    const onResize = () => this.fitCamera();
+    this.scale.on('resize', onResize);
+    this.events.once('shutdown', () => this.scale.off('resize', onResize));
 
     this.add
       .text(WORLD_W / 2, WORLD_H / 2, 'walking to the clubhouse…', {
@@ -53,6 +55,7 @@ export class WorldScene extends Scene {
 
   private fitCamera() {
     const { width, height } = this.scale;
+    if (width < 2 || height < 2) return; // mid-resize the viewport can be 0
     const zoom = Math.min(width / WORLD_W, height / WORLD_H);
     this.cameras.main.setZoom(zoom);
     this.cameras.main.centerOn(WORLD_W / 2, WORLD_H / 2);

@@ -155,7 +155,9 @@ export class PlayScene extends Scene {
     this.updateHud();
 
     this.fitCamera();
-    this.scale.on('resize', () => this.fitCamera());
+    const onResize = () => this.fitCamera();
+    this.scale.on('resize', onResize);
+    this.events.once('shutdown', () => this.scale.off('resize', onResize));
     this.setupInput();
     this.setupGhost();
 
@@ -259,6 +261,7 @@ export class PlayScene extends Scene {
 
   private fitCamera() {
     const { width, height } = this.scale;
+    if (width < 2 || height < 2) return; // mid-resize the viewport can be 0
     const zoom = Math.min(width / WORLD_W, height / WORLD_H);
     const cam = this.cameras.main;
     cam.setZoom(zoom);
